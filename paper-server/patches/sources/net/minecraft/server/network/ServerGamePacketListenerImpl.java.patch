@@ -2523,7 +2523,14 @@
          }
      }
  
-@@ -2134,7 +_,7 @@
+@@ -2129,12 +_,14 @@
+     @Override
+     public void handleChatSessionUpdate(final ServerboundChatSessionUpdatePacket packet) {
+         PacketUtils.ensureRunningOnSameThread(packet, this, this.player.level());
++        // KigPaper - don't init session if secure profiles are disabled
++        if (!server.enforceSecureProfile()) return;
+         RemoteChatSession.Data newChatSession = packet.chatSession();
+         ProfilePublicKey.Data oldProfileKey = this.chatSession != null ? this.chatSession.profilePublicKey().data() : null;
          ProfilePublicKey.Data newProfileKey = newChatSession.profilePublicKey();
          if (!Objects.equals(oldProfileKey, newProfileKey)) {
              if (oldProfileKey != null && newProfileKey.expiresAt().isBefore(oldProfileKey.expiresAt())) {
