@@ -1,0 +1,121 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: RoccoDev <hey@rocco.dev>
+Date: Sun, 30 Aug 2026 22:09:43 +0200
+Subject: [PATCH] Legacy Combat
+
+
+diff --git a/net/minecraft/world/entity/LivingEntity.java b/net/minecraft/world/entity/LivingEntity.java
+index 3a4da514c163e7565fc241835db52c464a5c4734..a5cd6045366bf5dfb2c78be3c26ea7555761f00e 100644
+--- a/net/minecraft/world/entity/LivingEntity.java
++++ b/net/minecraft/world/entity/LivingEntity.java
+@@ -7,6 +7,7 @@ import com.google.common.collect.Lists;
+ import com.google.common.collect.Maps;
+ import com.mojang.datafixers.util.Pair;
+ import com.mojang.logging.LogUtils;
++import com.playkig.kigpaper.config.KigPaperConfig;
+ import it.unimi.dsi.fastutil.doubles.DoubleDoubleImmutablePair;
+ import it.unimi.dsi.fastutil.objects.Object2LongMap;
+ import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
+@@ -2070,7 +2071,9 @@ public abstract class LivingEntity extends Entity implements Attackable, Waypoin
+             Vec3 deltaVector = new Vec3(xd, 0.0, zd).normalize().scale(power);
+             Vec3 targetMovement = new Vec3( // Paper - knockback events
+                 deltaMovement.x / 2.0 - deltaVector.x,
+-                this.onGround() ? Math.min(0.4, deltaMovement.y / 2.0 + power) : deltaMovement.y,
++                // KigPaper - legacy combat
++                this.onGround() || KigPaperConfig.get().legacyCombat().airborneVerticalKnockback
++                        ? Math.min(0.4, deltaMovement.y / 2.0 + power) : deltaMovement.y,
+                 deltaMovement.z / 2.0 - deltaVector.z
+             );
+             // Paper start - knockback events
+diff --git a/net/minecraft/world/entity/player/Player.java b/net/minecraft/world/entity/player/Player.java
+index 2a71a2fa949b3a7fb8ff2c44ec3a3d8636237142..357b6bab4d6e548b6e104eaefd50e466c03f3fdc 100644
+--- a/net/minecraft/world/entity/player/Player.java
++++ b/net/minecraft/world/entity/player/Player.java
+@@ -11,6 +11,9 @@ import java.util.List;
+ import java.util.Optional;
+ import java.util.OptionalInt;
+ import java.util.function.Predicate;
++
++import com.playkig.kigpaper.config.KigPaperConfig;
++import com.playkig.kigpaper.config.LegacyCombatConfigImpl;
+ import net.minecraft.core.BlockPos;
+ import net.minecraft.core.Direction;
+ import net.minecraft.core.GlobalPos;
+@@ -1027,6 +1030,9 @@ public abstract class Player extends Avatar implements ContainerUser {
+             willAttack
+         );
+ 
++        // KigPaper - legacy combat
++        LegacyCombatConfigImpl legacyCombat = KigPaperConfig.get().legacyCombat();
++
+         if (playerAttackEntityEvent.callEvent() && willAttack) { // Logic moved to willAttack local variable.
+         // Paper end - PlayerAttackEntityEvent
+             float baseDamage = this.isAutoSpinAttack() ? this.autoSpinAttackDmg : (float)this.getAttributeValue(Attributes.ATTACK_DAMAGE);
+@@ -1042,7 +1048,9 @@ public abstract class Player extends Avatar implements ContainerUser {
+                     boolean fullStrengthAttack = attackStrengthScale > 0.9F;
+                     boolean knockbackAttack;
+                     if (this.isSprinting() && fullStrengthAttack) {
+-                        this.playServerSideSound(SoundEvents.PLAYER_ATTACK_KNOCKBACK);
++                        if (!legacyCombat.legacyHitSounds) { // KigPaper - legacy combat
++                            this.playServerSideSound(SoundEvents.PLAYER_ATTACK_KNOCKBACK);
++                        }
+                         knockbackAttack = true;
+                     } else {
+                         knockbackAttack = false;
+@@ -1079,7 +1087,9 @@ public abstract class Player extends Avatar implements ContainerUser {
+                         this.damageStatsAndHearts(entity, oldLivingEntityHealth);
+                         this.causeFoodExhaustion(this.level().spigotConfig.combatExhaustion, org.bukkit.event.entity.EntityExhaustionEvent.ExhaustionReason.ATTACK); // CraftBukkit - EntityExhaustionEvent // Spigot - Change to use configurable value
+                     } else {
+-                        this.playServerSideSound(SoundEvents.PLAYER_ATTACK_NODAMAGE);
++                        if (!legacyCombat.legacyHitSounds) { // KigPaper - legacy combat
++                            this.playServerSideSound(SoundEvents.PLAYER_ATTACK_NODAMAGE);
++                        }
+                     }
+                 }
+ 
+@@ -1120,10 +1130,14 @@ public abstract class Player extends Avatar implements ContainerUser {
+             && !this.isMobilityRestricted()
+             && !this.isPassenger()
+             && entity instanceof LivingEntity
+-            && !this.isSprinting();
++            && (!this.isSprinting() || KigPaperConfig.get().legacyCombat().allowSprintCriticals); // KigPaper - legacy combat
+     }
+ 
+     private boolean isSweepAttack(final boolean fullStrengthAttack, final boolean criticalAttack, final boolean knockbackAttack) {
++        // KigPaper - legacy combat
++        if (KigPaperConfig.get().legacyCombat().disableSweepingAttacks) {
++            return false;
++        }
+         if (fullStrengthAttack && !criticalAttack && !knockbackAttack && this.onGround()) {
+             double approximateSpeedSq = this.getKnownMovement().horizontalDistanceSqr();
+             double maxSpeedForSweepAttack = this.getSpeed() * 2.5;
+@@ -1143,12 +1157,17 @@ public abstract class Player extends Avatar implements ContainerUser {
+         final boolean stabAttack,
+         final float magicBoost
+     ) {
++        // KigPaper - legacy combat
++        LegacyCombatConfigImpl legacyCombat = KigPaperConfig.get().legacyCombat();
++
+         if (criticalAttack) {
+-            this.playServerSideSound(SoundEvents.PLAYER_ATTACK_CRIT);
++            if (!legacyCombat.legacyHitSounds) { // KigPaper - legacy combat
++                this.playServerSideSound(SoundEvents.PLAYER_ATTACK_CRIT);
++            }
+             this.crit(entity);
+         }
+ 
+-        if (!criticalAttack && !sweepAttack && !stabAttack) {
++        if (!criticalAttack && !sweepAttack && !stabAttack && !legacyCombat.legacyHitSounds) { // KigPaper - legacy combat
+             this.playServerSideSound(fullStrengthAttack ? SoundEvents.PLAYER_ATTACK_STRONG : SoundEvents.PLAYER_ATTACK_WEAK);
+         }
+ 
+@@ -1161,7 +1180,8 @@ public abstract class Player extends Avatar implements ContainerUser {
+         if (entity instanceof LivingEntity livingEntity) {
+             float actualDamage = oldLivingEntityHealth - livingEntity.getHealth();
+             this.awardStat(Stats.DAMAGE_DEALT, Math.round(actualDamage * 10.0F));
+-            if (this.level() instanceof ServerLevel && actualDamage > 2.0F) {
++            if (this.level() instanceof ServerLevel && actualDamage > 2.0F
++                    && !KigPaperConfig.get().legacyCombat().disableDamageParticles) { // KigPaper - legacy combat
+                 int count = (int)(actualDamage * 0.5);
+                 ((ServerLevel)this.level())
+                     .sendParticles(ParticleTypes.DAMAGE_INDICATOR, entity.getX(), entity.getY(0.5), entity.getZ(), count, 0.1, 0.0, 0.1, 0.2);
