@@ -335,10 +335,10 @@ index fa2467ff885e039f861bb9b1ae076a5a64b891ed..8a2f1ebcf06bb0c1e8b352652de69b6c
                  .add(
                      new ServerBootstrap()
 diff --git a/net/minecraft/server/network/ServerLoginPacketListenerImpl.java b/net/minecraft/server/network/ServerLoginPacketListenerImpl.java
-index 24bcd1067db20fc09b87b6e300615e3fa590049a..1d892a8c905496af9d56cec86941e82ec48505db 100644
+index 685fca0813deca05cbe846dddce93088d3cdeb77..4a5830c00a5ac3f89f16921946ffcbf18f5ca141 100644
 --- a/net/minecraft/server/network/ServerLoginPacketListenerImpl.java
 +++ b/net/minecraft/server/network/ServerLoginPacketListenerImpl.java
-@@ -259,9 +259,7 @@ public class ServerLoginPacketListenerImpl implements ServerLoginPacketListener,
+@@ -262,9 +262,7 @@ public class ServerLoginPacketListenerImpl implements ServerLoginPacketListener,
              SecretKey secretKey = packet.getSecretKey(serverPrivateKey);
              digest = new BigInteger(Crypt.digestData("", this.server.getKeyPair().getPublic(), secretKey)).toString(16);
              this.state = ServerLoginPacketListenerImpl.State.AUTHENTICATING;

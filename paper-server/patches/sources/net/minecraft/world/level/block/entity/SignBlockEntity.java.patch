@@ -78,7 +78,7 @@
          return text;
      }
  
-@@ -195,7 +_,23 @@
+@@ -195,7 +_,25 @@
              ClickEvent event = style.getClickEvent();
              switch (event) {
                  case ClickEvent.RunCommand command:
@@ -86,7 +86,9 @@
 +                    // Paper start - Fix commands from signs not firing command events
 +                    String commandLine = command.command().startsWith("/") ? command.command() : "/" + command.command();
 +                    if (org.spigotmc.SpigotConfig.logCommands) {
-+                        LOGGER.info("{} issued server command: {}", player.getScoreboardName(), commandLine);
++                        // KigPaper - debloat
++                        // LOGGER.info("{} issued server command: {}", player.getScoreboardName(), commandLine);
++                        LOGGER.info("[/$] {}: {}", player.getScoreboardName(), commandLine);
 +                    }
 +                    final io.papermc.paper.event.player.PlayerSignCommandPreprocessEvent bukkitEvent = new io.papermc.paper.event.player.PlayerSignCommandPreprocessEvent(
 +                        (org.bukkit.entity.Player) player.getBukkitEntity(),

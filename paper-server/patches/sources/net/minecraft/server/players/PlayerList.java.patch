@@ -89,7 +89,7 @@
          playerConnection.send(new ClientboundChangeDifficultyPacket(levelData.getDifficulty(), levelData.isDifficultyLocked()));
          playerConnection.send(new ClientboundPlayerAbilitiesPacket(player.getAbilities()));
          playerConnection.send(new ClientboundSetHeldSlotPacket(player.getInventory().getSelectedSlot()));
-@@ -205,24 +_,129 @@
+@@ -205,24 +_,132 @@
              component = Component.translatable("multiplayer.player.joined.renamed", player.getDisplayName(), oldName);
          }
  
@@ -199,7 +199,8 @@
 +        }
 +        // Paper end - Configurable player collision
 +        // CraftBukkit start - moved down
-+        LOGGER.info(
++        // KigPaper start - debloat
++        /* LOGGER.info(
 +            "{}[{}] logged in with entity id {} at ([{}]{}, {}, {})", // Paper - add world identifier
 +            player.getPlainTextName(),
 +            address,
@@ -208,7 +209,9 @@
 +            player.getX(),
 +            player.getY(),
 +            player.getZ()
-+        );
++        ); */
++        LOGGER.info("[+] {} [{}] ({})", player.getPlainTextName(), address, player.getUUID());
++        // KigPaper end
 +        // CraftBukkit end - moved down
 +        // Paper start - Send empty chunk, so players aren't stuck in the world loading screen with our chunk system not sending chunks when dead
 +        if (player.isDeadOrDying()) {

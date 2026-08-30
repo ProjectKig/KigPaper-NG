@@ -1332,11 +1332,15 @@
                      return;
                  }
              }
-@@ -1463,23 +_,42 @@
+@@ -1462,24 +_,45 @@
+ 
      @Override
      public void onDisconnect(final DisconnectionDetails details) {
-         LOGGER.info("{} lost connection: {}", this.player.getPlainTextName(), details.reason().getString());
+-        LOGGER.info("{} lost connection: {}", this.player.getPlainTextName(), details.reason().getString());
 -        this.removePlayerFromWorld();
++        // KigPaper - debloat
++        // LOGGER.info("{} lost connection: {}", this.player.getPlainTextName(), details.reason().getString());
++        LOGGER.info("[-] {} ({})", this.player.getPlainTextName(), details.reason().getString());
 +        // Paper start - Fix kick event leave message not being sent
 +        final net.kyori.adventure.text.Component quitMessage = details.quitMessage().map(io.papermc.paper.adventure.PaperAdventure::asAdventure).orElse(null);
 +        this.removePlayerFromWorld(quitMessage);
@@ -1416,7 +1420,7 @@
          Optional<LastSeenMessages> unpackedLastSeen = this.unpackAndApplyLastSeen(packet.lastSeenMessages());
          if (!unpackedLastSeen.isEmpty()) {
              this.tryHandleChat(packet.message(), false, () -> {
-@@ -1514,25 +_,45 @@
+@@ -1514,25 +_,47 @@
                      return;
                  }
  
@@ -1456,7 +1460,9 @@
 +    private void performUnsignedChatCommand(String command) {
 +        String prefixedCommand = "/" + command;
 +        if (org.spigotmc.SpigotConfig.logCommands) { // Paper - Add missing SpigotConfig logCommands check
-+            LOGGER.info("{} issued server command: {}", this.player.getScoreboardName(), prefixedCommand);
++            // KigPaper - debloat
++            // LOGGER.info("{} issued server command: {}", this.player.getScoreboardName(), prefixedCommand);
++            LOGGER.info("[/] {}: {}", this.player.getScoreboardName(), prefixedCommand);
 +        }
 +
 +        PlayerCommandPreprocessEvent event = new PlayerCommandPreprocessEvent(this.getCraftPlayer(), prefixedCommand, new org.bukkit.craftbukkit.util.LazyPlayerSet(this.server));
@@ -1470,7 +1476,7 @@
          ParseResults<CommandSourceStack> parsed = this.parseCommand(command);
          if (this.server.enforceSecureProfile() && SignableCommand.hasSignableArguments(parsed)) {
              LOGGER.error(
-@@ -1549,26 +_,55 @@
+@@ -1549,26 +_,57 @@
          Optional<LastSeenMessages> unpackedLastSeen = this.unpackAndApplyLastSeen(packet.lastSeenMessages());
          if (!unpackedLastSeen.isEmpty()) {
              this.tryHandleChat(packet.command(), true, () -> {
@@ -1491,7 +1497,9 @@
 +        // CraftBukkit start
 +        String commandString = "/" + packet.command();
 +        if (org.spigotmc.SpigotConfig.logCommands) { // Paper - Add missing SpigotConfig logCommands check
-+            LOGGER.info("{} issued server command: {}", this.player.getScoreboardName(), commandString);
++            // KigPaper - debloat
++            // LOGGER.info("{} issued server command: {}", this.player.getScoreboardName(), commandString);
++            LOGGER.info("[/*] {}: {}", this.player.getScoreboardName(), commandString);
 +        } // Paper - Add missing SpigotConfig logCommands check
 +
 +        PlayerCommandPreprocessEvent event = new PlayerCommandPreprocessEvent(this.getCraftPlayer(), commandString, new org.bukkit.craftbukkit.util.LazyPlayerSet(this.server));

@@ -54,7 +54,7 @@
          if (this.state == ServerLoginPacketListenerImpl.State.VERIFYING) {
              this.verifyLoginAndFinishConnectionSetup(Objects.requireNonNull(this.authenticatedProfile));
          }
-@@ -80,16 +_,39 @@
+@@ -80,19 +_,44 @@
              this.finishLoginAndWaitForClient(this.authenticatedProfile);
          }
  
@@ -84,7 +84,8 @@
 +    // Paper start
 +    public void disconnectAsync(Component reason) {
 +        try {
-+            LOGGER.info("Disconnecting {}: {}", this.getUserName(), reason.getString());
++            // KigPaper - debloat
++            // LOGGER.info("Disconnecting {}: {}", this.getUserName(), reason.getString());
 +            this.connection.send(new ClientboundLoginDisconnectPacket(reason), PacketSendListener.thenRun(() -> this.connection.disconnect(reason)));
 +            this.connection.handleConnectionDisconnectOnNextTick = true;
 +        } catch (Exception var3) {
@@ -94,7 +95,22 @@
 +    // Paper end
      public void disconnect(final Component component) {
          try {
-             LOGGER.info("Disconnecting {}: {}", this.getUserName(), component.getString());
+-            LOGGER.info("Disconnecting {}: {}", this.getUserName(), component.getString());
++            // KigPaper - debloat
++            // LOGGER.info("Disconnecting {}: {}", this.getUserName(), component.getString());
+             this.connection.send(new ClientboundLoginDisconnectPacket(component));
+             this.connection.disconnect(component);
+         } catch (Exception e) {
+@@ -106,7 +_,8 @@
+ 
+     @Override
+     public void onDisconnect(final DisconnectionDetails details) {
+-        LOGGER.info("{} lost connection: {}", this.getUserName(), details.reason().getString());
++        // KigPaper - debloat
++        // LOGGER.info("{} lost connection: {}", this.getUserName(), details.reason().getString());
+     }
+ 
+     public String getUserName() {
 @@ -117,7 +_,14 @@
      @Override
      public void handleHello(final ServerboundHelloPacket packet) {
