@@ -3,6 +3,7 @@ package io.papermc.paper.configuration;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.Table;
 import com.mojang.logging.LogUtils;
+import com.playkig.kigpaper.config.KigConfigurations;
 import io.leangen.geantyref.TypeToken;
 import io.papermc.paper.configuration.legacy.RequiresSpigotInitialization;
 import io.papermc.paper.configuration.mapping.Definition;
@@ -158,9 +159,13 @@ public class PaperConfigurations extends Configurations<GlobalConfiguration, Wor
     });
     public static final ContextKey<Supplier<SpigotWorldConfig>> SPIGOT_WORLD_CONFIG_CONTEXT_KEY = new ContextKey<>(new TypeToken<Supplier<SpigotWorldConfig>>() {}, "spigot world config");
 
+    // KigPaper
+    private final KigConfigurations kigConfigurations;
 
     public PaperConfigurations(final Path globalFolder) {
         super(globalFolder, GlobalConfiguration.class, WorldConfiguration.class, GLOBAL_CONFIG_FILE_NAME, WORLD_DEFAULTS_CONFIG_FILE_NAME, WORLD_CONFIG_FILE_NAME);
+        // KigPaper
+        kigConfigurations = new KigConfigurations(globalFolder);
     }
 
     @Override
@@ -224,6 +229,8 @@ public class PaperConfigurations extends Configurations<GlobalConfiguration, Wor
     public GlobalConfiguration initializeGlobalConfiguration(final RegistryAccess registryAccess) throws ConfigurateException {
         GlobalConfiguration configuration = super.initializeGlobalConfiguration(registryAccess);
         GlobalConfiguration.set(configuration);
+        // KigPaper
+        kigConfigurations.initializeGlobalConfiguration(registryAccess);
         return configuration;
     }
 
@@ -339,6 +346,8 @@ public class PaperConfigurations extends Configurations<GlobalConfiguration, Wor
         } catch (Exception ex) {
             throw new RuntimeException("Could not reload paper configuration files", ex);
         }
+        // KigPaper
+        kigConfigurations.reloadConfigs(server);
     }
 
     private static List<Definition<? extends Annotation, ?, ? extends FieldProcessor.Factory<?, ?>>> defaultFieldProcessors() {
