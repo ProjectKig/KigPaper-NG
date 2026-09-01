@@ -1,6 +1,15 @@
 --- a/net/minecraft/stats/ServerRecipeBook.java
 +++ b/net/minecraft/stats/ServerRecipeBook.java
-@@ -64,17 +_,21 @@
+@@ -12,6 +_,8 @@
+ import java.util.Set;
+ import java.util.function.Consumer;
+ import java.util.function.Predicate;
++
++import com.playkig.kigpaper.config.KigPaperConfig;
+ import net.minecraft.advancements.triggers.CriteriaTriggers;
+ import net.minecraft.network.protocol.game.ClientboundRecipeBookAddPacket;
+ import net.minecraft.network.protocol.game.ClientboundRecipeBookRemovePacket;
+@@ -64,18 +_,25 @@
          for (RecipeHolder<?> recipe : recipes) {
              ResourceKey<Recipe<?>> id = recipe.id();
              if (!this.known.contains(id) && !recipe.value().isSpecial()) {
@@ -20,10 +29,15 @@
          }
  
 -        if (!recipesToAdd.isEmpty()) {
-+        if (!recipesToAdd.isEmpty() && player.connection != null) { // SPIGOT-4478 during PlayerLoginEvent
-             player.connection.send(new ClientboundRecipeBookAddPacket(recipesToAdd, false));
+-            player.connection.send(new ClientboundRecipeBookAddPacket(recipesToAdd, false));
++        // KigPaper
++        if (KigPaperConfig.get().sendRecipeBook()) {
++            if (!recipesToAdd.isEmpty() && player.connection != null) { // SPIGOT-4478 during PlayerLoginEvent
++                player.connection.send(new ClientboundRecipeBookAddPacket(recipesToAdd, false));
++            }
          }
  
+         return recipesToAdd.size();
 @@ -92,7 +_,7 @@
              }
          }
@@ -33,3 +47,14 @@
              player.connection.send(new ClientboundRecipeBookRemovePacket(recipesToRemove));
          }
  
+@@ -115,6 +_,10 @@
+ 
+     public void sendInitialRecipeBook(final ServerPlayer player) {
+         player.connection.send(new ClientboundRecipeBookSettingsPacket(this.getBookSettings().copy()));
++        // KigPaper
++        if (!KigPaperConfig.get().sendRecipeBook()) {
++            return;
++        }
+         List<ClientboundRecipeBookAddPacket.Entry> recipesToSend = new ArrayList<>(this.known.size());
+ 
+         for (ResourceKey<Recipe<?>> id : this.known) {

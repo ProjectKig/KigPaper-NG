@@ -9,6 +9,7 @@ public class KigPaperConfig extends ConfigurationPart {
   private static KigPaperConfig INSTANCE;
 
   public LegacyCombatConfigImpl legacyCombat;
+  public boolean sendRecipeBook = true;
 
   public static KigPaperConfig get() {
     return INSTANCE;
@@ -20,6 +21,10 @@ public class KigPaperConfig extends ConfigurationPart {
 
   public LegacyCombatConfigImpl legacyCombat() {
     return legacyCombat;
+  }
+
+  public boolean sendRecipeBook() {
+    return sendRecipeBook;
   }
 
   private static <T> CheckedFunction<ConfigurationNode, T, SerializationException> creator(final Class<? extends T> type, final boolean refreshNode) {
