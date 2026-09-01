@@ -127,7 +127,7 @@
          this.requestedUsername = packet.name();
          GameProfile singleplayerProfile = this.server.getSingleplayerProfile();
          if (singleplayerProfile != null && this.requestedUsername.equalsIgnoreCase(singleplayerProfile.name())) {
-@@ -127,7 +_,30 @@
+@@ -127,7 +_,31 @@
                  this.state = ServerLoginPacketListenerImpl.State.KEY;
                  this.connection.send(new ClientboundHelloPacket("", this.server.getKeyPair().getPublic().getEncoded(), this.challenge, true));
              } else {
@@ -148,7 +148,8 @@
 +                        GameProfile gameprofile = ServerLoginPacketListenerImpl.this.createOfflineProfile(ServerLoginPacketListenerImpl.this.requestedUsername); // Spigot
 +
 +                        gameprofile = ServerLoginPacketListenerImpl.this.callPlayerPreLoginEvents(gameprofile); // Paper - Add more fields to AsyncPlayerPreLoginEvent
-+                        ServerLoginPacketListenerImpl.LOGGER.info("UUID of player {} is {}", gameprofile.name(), gameprofile.id());
++                        // KigPaper - debloat
++                        // ServerLoginPacketListenerImpl.LOGGER.info("UUID of player {} is {}", gameprofile.name(), gameprofile.id());
 +                        ServerLoginPacketListenerImpl.this.startClientVerification(gameprofile);
 +                    } catch (Exception ex) {
 +                        ServerLoginPacketListenerImpl.this.disconnect("Failed to verify username!");
@@ -212,17 +213,19 @@
              @Override
              public void run() {
                  String name = Objects.requireNonNull(ServerLoginPacketListenerImpl.this.requestedUsername, "Player name not initialized");
-@@ -200,12 +_,18 @@
+@@ -200,12 +_,19 @@
                          .hasJoinedServer(name, digest, this.getAddress());
                      if (result != null) {
                          GameProfile profile = result.profile();
+-                        ServerLoginPacketListenerImpl.LOGGER.info("UUID of player {} is {}", profile.name(), profile.id());
 +                        // CraftBukkit start - fire PlayerPreLoginEvent
 +                        if (!ServerLoginPacketListenerImpl.this.connection.isConnected()) {
 +                            return;
 +                        }
 +                        profile = ServerLoginPacketListenerImpl.this.callPlayerPreLoginEvents(profile); // Paper - Add more fields to AsyncPlayerPreLoginEvent
 +                        // CraftBukkit end
-                         ServerLoginPacketListenerImpl.LOGGER.info("UUID of player {} is {}", profile.name(), profile.id());
++                        // KigPaper - debloat
++                        // ServerLoginPacketListenerImpl.LOGGER.info("UUID of player {} is {}", profile.name(), profile.id());
                          ServerLoginPacketListenerImpl.this.serverActivityMonitor.reportLoginActivity();
                          ServerLoginPacketListenerImpl.this.startClientVerification(profile);
                      } else if (ServerLoginPacketListenerImpl.this.server.isSingleplayer()) {
@@ -251,7 +254,7 @@
                  }
              }
  
-@@ -227,18 +_,123 @@
+@@ -227,18 +_,124 @@
                      ? inetSocketAddress.getAddress()
                      : null;
              }
@@ -360,7 +363,8 @@
 +            authenticatorPool.execute(() -> {
 +                try {
 +                    final GameProfile gameprofile = this.callPlayerPreLoginEvents(this.authenticatedProfile);
-+                    ServerLoginPacketListenerImpl.LOGGER.info("UUID of player {} is {}", gameprofile.name(), gameprofile.id());
++                    // KigPaper - debloat
++                    // ServerLoginPacketListenerImpl.LOGGER.info("UUID of player {} is {}", gameprofile.name(), gameprofile.id());
 +                    ServerLoginPacketListenerImpl.this.startClientVerification(gameprofile);
 +                } catch (Exception ex) {
 +                    disconnect("Failed to verify username!");
