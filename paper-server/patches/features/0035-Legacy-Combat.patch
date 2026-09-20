@@ -5,30 +5,63 @@ Subject: [PATCH] Legacy Combat
 
 
 diff --git a/net/minecraft/world/entity/LivingEntity.java b/net/minecraft/world/entity/LivingEntity.java
-index 3a4da514c163e7565fc241835db52c464a5c4734..a5cd6045366bf5dfb2c78be3c26ea7555761f00e 100644
+index 3a4da514c163e7565fc241835db52c464a5c4734..954460c700c09a2348481fb0811b352f627ffee8 100644
 --- a/net/minecraft/world/entity/LivingEntity.java
 +++ b/net/minecraft/world/entity/LivingEntity.java
-@@ -7,6 +7,7 @@ import com.google.common.collect.Lists;
+@@ -7,6 +7,8 @@ import com.google.common.collect.Lists;
  import com.google.common.collect.Maps;
  import com.mojang.datafixers.util.Pair;
  import com.mojang.logging.LogUtils;
 +import com.playkig.kigpaper.config.KigPaperConfig;
++import com.playkig.kigpaper.config.LegacyCombatConfig;
  import it.unimi.dsi.fastutil.doubles.DoubleDoubleImmutablePair;
  import it.unimi.dsi.fastutil.objects.Object2LongMap;
  import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
-@@ -2070,7 +2071,9 @@ public abstract class LivingEntity extends Entity implements Attackable, Waypoin
+@@ -1482,7 +1484,8 @@ public abstract class LivingEntity extends Entity implements Attackable, Waypoin
+             if (!this.actuallyHurt(level, source, (float)event.getFinalDamage(), event)) { // Paper - fix invulnerability reduction in EntityDamageEvent - no longer subtract lastHurt, that is part of the damage event calc now
+                 return false;
+             }
+-            if (this instanceof ServerPlayer && event.getDamage() == 0 && originalDamage == 0) return false; // Paper - revert to vanilla damage - players are not affected by damage that is 0 - skip damage if the vanilla damage is 0 and was not modified by plugins in the event.
++            // KigPaper - legacy combat
++            if (this instanceof ServerPlayer player && !player.legacyCombatConfig().zeroDamageHits() && event.getDamage() == 0 && originalDamage == 0) return false; // Paper - revert to vanilla damage - players are not affected by damage that is 0 - skip damage if the vanilla damage is 0 and was not modified by plugins in the event.
+             // CraftBukkit end
+             this.lastHurt = damage;
+             tookFullDamage = false;
+@@ -1495,7 +1498,8 @@ public abstract class LivingEntity extends Entity implements Attackable, Waypoin
+             if (!this.actuallyHurt(level, source, (float)event.getFinalDamage(), event)) {
+                 return false;
+             }
+-            if (this instanceof ServerPlayer && event.getDamage() == 0 && originalDamage == 0) return false; // Paper - revert to vanilla damage - players are not affected by damage that is 0 - skip damage if the vanilla damage is 0 and was not modified by plugins in the event.
++            // KigPaper - legacy combat
++            if (this instanceof ServerPlayer player && !player.legacyCombatConfig().zeroDamageHits() && event.getDamage() == 0 && originalDamage == 0) return false; // Paper - revert to vanilla damage - players are not affected by damage that is 0 - skip damage if the vanilla damage is 0 and was not modified by plugins in the event.
+             this.lastHurt = damage;
+             this.invulnerableTime = this.invulnerableDuration; // CraftBukkit - restore use of maxNoDamageTicks
+             // this.actuallyHurt(level, source, damage);
+@@ -2067,10 +2071,21 @@ public abstract class LivingEntity extends Entity implements Attackable, Waypoin
+                 zd = (this.random.nextDouble() - this.random.nextDouble()) * 0.01;
+             }
+ 
++            // KigPaper start - legacy combat
++            LegacyCombatConfig legacyCombat = KigPaperConfig.get().legacyCombat();
++            if (this instanceof Player player) {
++                legacyCombat = player.legacyCombatConfig();
++            } else if (attacker instanceof Player player) {
++                legacyCombat = player.legacyCombatConfig();
++            }
++            // KigPaper end
++
              Vec3 deltaVector = new Vec3(xd, 0.0, zd).normalize().scale(power);
              Vec3 targetMovement = new Vec3( // Paper - knockback events
                  deltaMovement.x / 2.0 - deltaVector.x,
 -                this.onGround() ? Math.min(0.4, deltaMovement.y / 2.0 + power) : deltaMovement.y,
 +                // KigPaper - legacy combat
-+                this.onGround() || KigPaperConfig.get().legacyCombat().airborneVerticalKnockback
++                this.onGround() || legacyCombat.airborneVerticalKnockback()
 +                        ? Math.min(0.4, deltaMovement.y / 2.0 + power) : deltaMovement.y,
                  deltaMovement.z / 2.0 - deltaVector.z
              );
              // Paper start - knockback events
 diff --git a/net/minecraft/world/entity/player/Player.java b/net/minecraft/world/entity/player/Player.java
-index 2a71a2fa949b3a7fb8ff2c44ec3a3d8636237142..357b6bab4d6e548b6e104eaefd50e466c03f3fdc 100644
+index 2a71a2fa949b3a7fb8ff2c44ec3a3d8636237142..a866e29b5666b028c8501ae4502052f456102893 100644
 --- a/net/minecraft/world/entity/player/Player.java
 +++ b/net/minecraft/world/entity/player/Player.java
 @@ -11,6 +11,9 @@ import java.util.List;
@@ -37,85 +70,371 @@ index 2a71a2fa949b3a7fb8ff2c44ec3a3d8636237142..357b6bab4d6e548b6e104eaefd50e466
  import java.util.function.Predicate;
 +
 +import com.playkig.kigpaper.config.KigPaperConfig;
-+import com.playkig.kigpaper.config.LegacyCombatConfigImpl;
++import com.playkig.kigpaper.config.LegacyCombatConfig;
  import net.minecraft.core.BlockPos;
  import net.minecraft.core.Direction;
  import net.minecraft.core.GlobalPos;
-@@ -1027,6 +1030,9 @@ public abstract class Player extends Avatar implements ContainerUser {
+@@ -121,7 +124,6 @@ import net.minecraft.world.level.storage.ValueOutput;
+ import net.minecraft.world.phys.AABB;
+ import net.minecraft.world.phys.Vec3;
+ import net.minecraft.world.scores.PlayerTeam;
+-import net.minecraft.world.scores.Team;
+ import org.jspecify.annotations.Nullable;
+ 
+ public abstract class Player extends Avatar implements ContainerUser {
+@@ -174,6 +176,7 @@ public abstract class Player extends Avatar implements ContainerUser {
+     public float hurtDir;
+     public boolean affectsSpawning = true; // Paper - Affects Spawning API
+     public net.kyori.adventure.util.TriState flyingFallDamage = net.kyori.adventure.util.TriState.NOT_SET; // Paper - flying fall damage
++    private @Nullable LegacyCombatConfig legacyCombatConfig; // KigPaper - legacy combat
+ 
+     // CraftBukkit start
+     public boolean fauxSleeping;
+@@ -1018,6 +1021,16 @@ public abstract class Player extends Avatar implements ContainerUser {
+             );
+     }
+ 
++    // KigPaper start - legacy combat
++    public LegacyCombatConfig legacyCombatConfig() {
++        return this.legacyCombatConfig != null ? this.legacyCombatConfig : KigPaperConfig.get().legacyCombat();
++    }
++
++    public void setLegacyCombatConfig(LegacyCombatConfig config) {
++        this.legacyCombatConfig = config;
++    }
++    // KigPaper end
++
+     public void attack(final Entity entity) {
+         // Paper start - PlayerAttackEntityEvent
+         boolean willAttack = !this.cannotAttack(entity); // Vanilla logic
+@@ -1027,6 +1040,9 @@ public abstract class Player extends Avatar implements ContainerUser {
              willAttack
          );
  
 +        // KigPaper - legacy combat
-+        LegacyCombatConfigImpl legacyCombat = KigPaperConfig.get().legacyCombat();
++        LegacyCombatConfig legacyCombat = legacyCombatConfig();
 +
          if (playerAttackEntityEvent.callEvent() && willAttack) { // Logic moved to willAttack local variable.
          // Paper end - PlayerAttackEntityEvent
              float baseDamage = this.isAutoSpinAttack() ? this.autoSpinAttackDmg : (float)this.getAttributeValue(Attributes.ATTACK_DAMAGE);
-@@ -1042,7 +1048,9 @@ public abstract class Player extends Avatar implements ContainerUser {
+@@ -1042,7 +1058,9 @@ public abstract class Player extends Avatar implements ContainerUser {
                      boolean fullStrengthAttack = attackStrengthScale > 0.9F;
                      boolean knockbackAttack;
                      if (this.isSprinting() && fullStrengthAttack) {
 -                        this.playServerSideSound(SoundEvents.PLAYER_ATTACK_KNOCKBACK);
-+                        if (!legacyCombat.legacyHitSounds) { // KigPaper - legacy combat
++                        if (!legacyCombat.legacyHitSounds()) { // KigPaper - legacy combat
 +                            this.playServerSideSound(SoundEvents.PLAYER_ATTACK_KNOCKBACK);
 +                        }
                          knockbackAttack = true;
                      } else {
                          knockbackAttack = false;
-@@ -1079,7 +1087,9 @@ public abstract class Player extends Avatar implements ContainerUser {
+@@ -1079,7 +1097,9 @@ public abstract class Player extends Avatar implements ContainerUser {
                          this.damageStatsAndHearts(entity, oldLivingEntityHealth);
                          this.causeFoodExhaustion(this.level().spigotConfig.combatExhaustion, org.bukkit.event.entity.EntityExhaustionEvent.ExhaustionReason.ATTACK); // CraftBukkit - EntityExhaustionEvent // Spigot - Change to use configurable value
                      } else {
 -                        this.playServerSideSound(SoundEvents.PLAYER_ATTACK_NODAMAGE);
-+                        if (!legacyCombat.legacyHitSounds) { // KigPaper - legacy combat
++                        if (!legacyCombat.legacyHitSounds()) { // KigPaper - legacy combat
 +                            this.playServerSideSound(SoundEvents.PLAYER_ATTACK_NODAMAGE);
 +                        }
                      }
                  }
  
-@@ -1120,10 +1130,14 @@ public abstract class Player extends Avatar implements ContainerUser {
+@@ -1120,10 +1140,14 @@ public abstract class Player extends Avatar implements ContainerUser {
              && !this.isMobilityRestricted()
              && !this.isPassenger()
              && entity instanceof LivingEntity
 -            && !this.isSprinting();
-+            && (!this.isSprinting() || KigPaperConfig.get().legacyCombat().allowSprintCriticals); // KigPaper - legacy combat
++            && (!this.isSprinting() || legacyCombatConfig().allowSprintCriticals()); // KigPaper - legacy combat
      }
  
      private boolean isSweepAttack(final boolean fullStrengthAttack, final boolean criticalAttack, final boolean knockbackAttack) {
 +        // KigPaper - legacy combat
-+        if (KigPaperConfig.get().legacyCombat().disableSweepingAttacks) {
++        if (legacyCombatConfig().disableSweepingAttacks()) {
 +            return false;
 +        }
          if (fullStrengthAttack && !criticalAttack && !knockbackAttack && this.onGround()) {
              double approximateSpeedSq = this.getKnownMovement().horizontalDistanceSqr();
              double maxSpeedForSweepAttack = this.getSpeed() * 2.5;
-@@ -1143,12 +1157,17 @@ public abstract class Player extends Avatar implements ContainerUser {
+@@ -1143,12 +1167,17 @@ public abstract class Player extends Avatar implements ContainerUser {
          final boolean stabAttack,
          final float magicBoost
      ) {
 +        // KigPaper - legacy combat
-+        LegacyCombatConfigImpl legacyCombat = KigPaperConfig.get().legacyCombat();
++        LegacyCombatConfig legacyCombat = legacyCombatConfig();
 +
          if (criticalAttack) {
 -            this.playServerSideSound(SoundEvents.PLAYER_ATTACK_CRIT);
-+            if (!legacyCombat.legacyHitSounds) { // KigPaper - legacy combat
++            if (!legacyCombat.legacyHitSounds()) { // KigPaper - legacy combat
 +                this.playServerSideSound(SoundEvents.PLAYER_ATTACK_CRIT);
 +            }
              this.crit(entity);
          }
  
 -        if (!criticalAttack && !sweepAttack && !stabAttack) {
-+        if (!criticalAttack && !sweepAttack && !stabAttack && !legacyCombat.legacyHitSounds) { // KigPaper - legacy combat
++        if (!criticalAttack && !sweepAttack && !stabAttack && !legacyCombat.legacyHitSounds()) { // KigPaper - legacy combat
              this.playServerSideSound(fullStrengthAttack ? SoundEvents.PLAYER_ATTACK_STRONG : SoundEvents.PLAYER_ATTACK_WEAK);
          }
  
-@@ -1161,7 +1180,8 @@ public abstract class Player extends Avatar implements ContainerUser {
+@@ -1161,7 +1190,8 @@ public abstract class Player extends Avatar implements ContainerUser {
          if (entity instanceof LivingEntity livingEntity) {
              float actualDamage = oldLivingEntityHealth - livingEntity.getHealth();
              this.awardStat(Stats.DAMAGE_DEALT, Math.round(actualDamage * 10.0F));
 -            if (this.level() instanceof ServerLevel && actualDamage > 2.0F) {
 +            if (this.level() instanceof ServerLevel && actualDamage > 2.0F
-+                    && !KigPaperConfig.get().legacyCombat().disableDamageParticles) { // KigPaper - legacy combat
++                    && !legacyCombatConfig().disableDamageParticles()) { // KigPaper - legacy combat
                  int count = (int)(actualDamage * 0.5);
                  ((ServerLevel)this.level())
                      .sendParticles(ParticleTypes.DAMAGE_INDICATOR, entity.getX(), entity.getY(0.5), entity.getZ(), count, 0.1, 0.0, 0.1, 0.2);
+@@ -1211,7 +1241,7 @@ public abstract class Player extends Avatar implements ContainerUser {
+         final boolean comesFromEffect
+     ) {
+         if (knockbackAmount > 0.0F) {
+-            if (entity instanceof LivingEntity livingTarget) {
++            if (entity instanceof LivingEntity livingTarget && !legacyCombatConfig().independentExtraKnockback()) {
+                 livingTarget.knockback(
+                     knockbackAmount, Mth.sin(this.getYRot() * Mth.DEG_TO_RAD), -Mth.cos(this.getYRot() * Mth.DEG_TO_RAD), damageSource, damage, comesFromEffect, this, io.papermc.paper.event.entity.EntityKnockbackEvent.Cause.ENTITY_ATTACK // Paper - knockback events
+                 );
+diff --git a/net/minecraft/world/entity/projectile/FishingHook.java b/net/minecraft/world/entity/projectile/FishingHook.java
+index c0bb1b62dfcdebbd34a8e8423fa36eb4924a55e5..dff1015be00ee2ba80df74425a71e01c5a21de4d 100644
+--- a/net/minecraft/world/entity/projectile/FishingHook.java
++++ b/net/minecraft/world/entity/projectile/FishingHook.java
+@@ -121,6 +121,12 @@ public class FishingHook extends Projectile {
+         this.setXRot((float)(Mth.atan2(newMovement.y, newMovement.horizontalDistance()) * 180.0F / (float)Math.PI));
+         this.yRotO = this.getYRot();
+         this.xRotO = this.getXRot();
++        // KigPaper - legacy combat
++        ProjectileUtil.kigpaper$initLegacy(this);
++        if (legacyMechanics) {
++            shootFromRotation(player, player.getXRot(), player.getYRot(), 0.0f, 1.5f, 1.0f);
++        }
++        // KigPaper end
+     }
+ 
+     @Override
+@@ -592,6 +598,11 @@ public class FishingHook extends Projectile {
+     }
+ 
+     public void pullEntity(final Entity entity) {
++        // KigPaper start - legacy combat
++        if (legacyMechanics && entity instanceof Player) {
++            return;
++        }
++        // KigPaper end
+         Entity owner = this.getOwner();
+         if (owner != null) {
+             Vec3 delta = new Vec3(owner.getX() - this.getX(), owner.getY() - this.getY(), owner.getZ() - this.getZ()).scale(0.1);
+diff --git a/net/minecraft/world/entity/projectile/Projectile.java b/net/minecraft/world/entity/projectile/Projectile.java
+index 9af4bf76974f05d9f752bbd4e8037560ec481cdf..39824acf19177c319850fd57c09b083c43eebb0a 100644
+--- a/net/minecraft/world/entity/projectile/Projectile.java
++++ b/net/minecraft/world/entity/projectile/Projectile.java
+@@ -45,6 +45,7 @@ public abstract class Projectile extends Entity implements TraceableEntity {
+     public boolean hasBeenShot = false;
+     private @Nullable Entity lastDeflectedBy;
+     protected boolean hitCancelled = false; // CraftBukkit
++    public boolean legacyMechanics; // KigPaper - legacy combat
+ 
+     protected Projectile(final EntityType<? extends Projectile> type, final Level level) {
+         super(type, level);
+@@ -52,6 +53,11 @@ public abstract class Projectile extends Entity implements TraceableEntity {
+ 
+     protected void setOwner(final @Nullable EntityReference<Entity> owner) {
+         this.owner = owner;
++        // KigPaper start - legacy combat
++        if (getOwner() instanceof Player player) {
++            legacyMechanics = player.legacyCombatConfig().legacyProjectiles();
++        }
++        // KigPaper end
+     }
+ 
+     public void setOwner(final @Nullable Entity owner) {
+@@ -130,6 +136,15 @@ public abstract class Projectile extends Entity implements TraceableEntity {
+     }
+ 
+     public Vec3 getMovementToShoot(final double xd, final double yd, final double zd, final float pow, final float uncertainty) {
++        // KigPaper start - legacy combat
++        if (legacyMechanics) {
++            return new Vec3(xd, yd, zd).normalize().add(
++                    this.random.nextGaussian() * 0.0075 * uncertainty,
++                    this.random.nextGaussian() * 0.0075 * uncertainty,
++                    this.random.nextGaussian() * 0.0075 * uncertainty
++            ).scale(pow);
++        }
++        // KigPaper end
+         return new Vec3(xd, yd, zd)
+             .normalize()
+             .add(
+@@ -155,6 +170,13 @@ public abstract class Projectile extends Entity implements TraceableEntity {
+         float xd = -Mth.sin(yRot * Mth.DEG_TO_RAD) * Mth.cos(xRot * Mth.DEG_TO_RAD);
+         float yd = -Mth.sin((xRot + yOffset) * Mth.DEG_TO_RAD);
+         float zd = Mth.cos(yRot * Mth.DEG_TO_RAD) * Mth.cos(xRot * Mth.DEG_TO_RAD);
++        // KigPaper start - legacy combat
++        if (legacyMechanics || source instanceof Player player && player.legacyCombatConfig().legacyProjectiles()) {
++            xd *= 0.4f;
++            yd *= 0.4f;
++            zd *= 0.4f;
++        }
++        // KigPaper end
+         this.shoot(xd, yd, zd, pow, uncertainty);
+         Vec3 sourceMovement = source.getKnownMovement();
+         // Paper start - allow disabling relative velocity
+diff --git a/net/minecraft/world/entity/projectile/ProjectileUtil.java b/net/minecraft/world/entity/projectile/ProjectileUtil.java
+index 7a94272f5d773ead519f4ddee908722e3f4cbd7a..9e20c13af4d3243b82bba1d5ed2157bd18e0bd13 100644
+--- a/net/minecraft/world/entity/projectile/ProjectileUtil.java
++++ b/net/minecraft/world/entity/projectile/ProjectileUtil.java
+@@ -10,6 +10,8 @@ import net.minecraft.util.Mth;
+ import net.minecraft.world.InteractionHand;
+ import net.minecraft.world.entity.Entity;
+ import net.minecraft.world.entity.LivingEntity;
++import net.minecraft.world.entity.Pose;
++import net.minecraft.world.entity.player.Player;
+ import net.minecraft.world.entity.projectile.arrow.AbstractArrow;
+ import net.minecraft.world.item.ArrowItem;
+ import net.minecraft.world.item.Item;
+@@ -151,9 +153,31 @@ public final class ProjectileUtil {
+     }
+ 
+     public static float computeMargin(final Entity source) {
++        // KigPaper start - legacy combat
++        if (source instanceof Projectile proj && proj.getOwner() instanceof Player player
++                && player.legacyCombatConfig().legacyProjectiles()) {
++            return 0.3f;
++        }
++        // KigPaper end
+         return Math.max(0.0F, Math.min(0.3F, (source.tickCount - 2) / 20.0F));
+     }
+ 
++    // KigPaper start - legacy combat
++    public static void kigpaper$initLegacy(final Projectile projectile) {
++        if (!(projectile.getOwner() instanceof Player player) || !player.legacyCombatConfig().legacyProjectiles()) {
++            return;
++        }
++        double x = player.getX() - (Mth.cos(player.getYRot() * Mth.DEG_TO_RAD) * 0.16F);
++        double y = player.getEyeY() - 0.1;
++        if (player.isCrouching()) {
++            // 1.8 sneaking difference
++            y += 1.54 - player.getEyeHeight(Pose.CROUCHING);
++        }
++        double z = player.getZ() - (Mth.sin(player.getYRot() * Mth.DEG_TO_RAD) * 0.16F);
++        projectile.absSnapTo(x, y, z, player.getYRot(), player.getXRot());
++    }
++    // KigPaper end
++
+     public static @Nullable EntityHitResult getEntityHitResult(
+         final Level level,
+         final Entity source,
+diff --git a/net/minecraft/world/entity/projectile/ThrowableProjectile.java b/net/minecraft/world/entity/projectile/ThrowableProjectile.java
+index 62a073c3cf878b8ef7592f5157b729b969e32107..621271072bf7fc1d45247f22f05401d165054d97 100644
+--- a/net/minecraft/world/entity/projectile/ThrowableProjectile.java
++++ b/net/minecraft/world/entity/projectile/ThrowableProjectile.java
+@@ -2,8 +2,10 @@ package net.minecraft.world.entity.projectile;
+ 
+ import net.minecraft.core.BlockPos;
+ import net.minecraft.core.particles.ParticleTypes;
++import net.minecraft.world.entity.Entity;
+ import net.minecraft.world.entity.EntityType;
+ import net.minecraft.world.entity.InsideBlockEffectApplier;
++import net.minecraft.world.entity.player.Player;
+ import net.minecraft.world.level.Level;
+ import net.minecraft.world.level.block.Blocks;
+ import net.minecraft.world.level.block.state.BlockState;
+@@ -45,8 +47,16 @@ public abstract class ThrowableProjectile extends Projectile {
+     @Override
+     public void tick() {
+         this.handleFirstTickBubbleColumn();
+-        this.applyGravity();
+-        this.applyInertia();
++        // KigPaper start - legacy combat
++        if (!legacyMechanics) {
++            this.applyGravity();
++            this.applyInertia();
++        } else {
++            if (tickCount >= 5) {
++                leftOwner = true;
++            }
++        }
++        // KigPaper end
+         HitResult result = ProjectileUtil.getHitResultOnMoveVector(this, this::canHitEntity);
+         Vec3 newPosition;
+         if (result.getType() != HitResult.Type.MISS) {
+@@ -55,11 +65,21 @@ public abstract class ThrowableProjectile extends Projectile {
+             newPosition = this.position().add(this.getDeltaMovement());
+         }
+ 
++        // KigPaper start - legacy combat
++        if (legacyMechanics) {
++            this.applyInertia();
++            this.applyGravity();
++            if (result.getType() != HitResult.Type.MISS && this.isAlive()) {
++                this.preHitTargetOrDeflectSelf(result);
++            }
++        }
++        // KigPaper end
++
+         this.setPos(newPosition);
+         this.updateRotation();
+         this.applyEffectsFromBlocks();
+         super.tick();
+-        if (result.getType() != HitResult.Type.MISS && this.isAlive()) {
++        if (!legacyMechanics && result.getType() != HitResult.Type.MISS && this.isAlive()) { // KigPaper
+             this.preHitTargetOrDeflectSelf(result); // CraftBukkit - projectile hit event
+         }
+     }
+diff --git a/net/minecraft/world/entity/projectile/arrow/AbstractArrow.java b/net/minecraft/world/entity/projectile/arrow/AbstractArrow.java
+index d25d525bad6b8096d80da19f3f969c1be514b115..9d8ce9b458ac6fa90a7f6d4f893eb1684a723619 100644
+--- a/net/minecraft/world/entity/projectile/arrow/AbstractArrow.java
++++ b/net/minecraft/world/entity/projectile/arrow/AbstractArrow.java
+@@ -25,13 +25,7 @@ import net.minecraft.tags.EntityTypeTags;
+ import net.minecraft.util.Mth;
+ import net.minecraft.util.Unit;
+ import net.minecraft.world.damagesource.DamageSource;
+-import net.minecraft.world.entity.Entity;
+-import net.minecraft.world.entity.EntityType;
+-import net.minecraft.world.entity.EntityTypes;
+-import net.minecraft.world.entity.LivingEntity;
+-import net.minecraft.world.entity.MoverType;
+-import net.minecraft.world.entity.OminousItemSpawner;
+-import net.minecraft.world.entity.SlotAccess;
++import net.minecraft.world.entity.*;
+ import net.minecraft.world.entity.ai.attributes.Attributes;
+ import net.minecraft.world.entity.player.Player;
+ import net.minecraft.world.entity.projectile.Projectile;
+@@ -120,6 +114,8 @@ public abstract class AbstractArrow extends Projectile {
+                 this.setPierceLevel((byte)pierceLevel);
+             }
+         }
++
++        ProjectileUtil.kigpaper$initLegacy(this); // KigPaper
+     }
+ 
+     protected AbstractArrow(
+diff --git a/net/minecraft/world/entity/projectile/throwableitemprojectile/ThrowableItemProjectile.java b/net/minecraft/world/entity/projectile/throwableitemprojectile/ThrowableItemProjectile.java
+index a7b1f28c4bbcfe8815cb4c88a4fb21f084142e31..d3e7ad1ff1c07c3380ba792d3bee8978643a1d61 100644
+--- a/net/minecraft/world/entity/projectile/throwableitemprojectile/ThrowableItemProjectile.java
++++ b/net/minecraft/world/entity/projectile/throwableitemprojectile/ThrowableItemProjectile.java
+@@ -3,10 +3,14 @@ package net.minecraft.world.entity.projectile.throwableitemprojectile;
+ import net.minecraft.network.syncher.EntityDataAccessor;
+ import net.minecraft.network.syncher.EntityDataSerializers;
+ import net.minecraft.network.syncher.SynchedEntityData;
++import net.minecraft.util.Mth;
+ import net.minecraft.world.entity.EntityType;
+ import net.minecraft.world.entity.LivingEntity;
++import net.minecraft.world.entity.player.Player;
+ import net.minecraft.world.entity.projectile.ItemSupplier;
++import net.minecraft.world.entity.projectile.ProjectileUtil;
+ import net.minecraft.world.entity.projectile.ThrowableProjectile;
++import net.minecraft.world.entity.projectile.arrow.AbstractArrow;
+ import net.minecraft.world.item.Item;
+ import net.minecraft.world.item.ItemStack;
+ import net.minecraft.world.level.Level;
+@@ -32,8 +36,10 @@ public abstract class ThrowableItemProjectile extends ThrowableProjectile implem
+     public ThrowableItemProjectile(
+         final EntityType<? extends ThrowableItemProjectile> type, final LivingEntity owner, final Level level, final ItemStack itemStack
+     ) {
+-        this(type, owner.getX(), owner.getEyeY() - 0.1F, owner.getZ(), level, itemStack);
++        this(type, owner.getX(), owner.getEyeY() - 0.1, owner.getZ(), level, itemStack);
+         this.setOwner(owner);
++
++        ProjectileUtil.kigpaper$initLegacy(this); // KigPaper
+     }
+ 
+     public void setItem(final ItemStack source) {

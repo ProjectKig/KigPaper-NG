@@ -8,7 +8,7 @@ import org.spongepowered.configurate.util.CheckedFunction;
 public class KigPaperConfig extends ConfigurationPart {
   private static KigPaperConfig INSTANCE;
 
-  public LegacyCombatConfigImpl legacyCombat;
+  public DefaultLegacyCombatConfig legacyCombat;
   public boolean sendRecipeBook = true;
 
   public static KigPaperConfig get() {
@@ -19,7 +19,7 @@ public class KigPaperConfig extends ConfigurationPart {
     INSTANCE = instance;
   }
 
-  public LegacyCombatConfigImpl legacyCombat() {
+  public DefaultLegacyCombatConfig legacyCombat() {
     return legacyCombat;
   }
 
