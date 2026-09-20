@@ -1,0 +1,59 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: RoccoDev <hey@rocco.dev>
+Date: Sun, 20 Sep 2026 08:02:58 +0200
+Subject: [PATCH] Fix PlayerTrackEntityEvent still tracking entities
+
+
+diff --git a/net/minecraft/server/level/ChunkMap.java b/net/minecraft/server/level/ChunkMap.java
+index 7e9361407042ddaabe3f66ee8957ae84b6ef2317..f96254fff20f2f0df183eb5ab4ef17467baf2068 100644
+--- a/net/minecraft/server/level/ChunkMap.java
++++ b/net/minecraft/server/level/ChunkMap.java
+@@ -1235,6 +1235,7 @@ public class ChunkMap extends SimpleRegionStorage implements ChunkHolder.PlayerP
+         private final int range;
+         private SectionPos lastSectionPos;
+         public final Set<ServerPlayerConnection> seenBy = new it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet<>(); // Paper - Perf: optimise map impl
++        private final Set<ServerPlayerConnection> ignoredBy = new it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet<>(); // Paper - entity tracking events
+ 
+         // Paper start - optimise entity tracker
+         private long lastChunkUpdate = -1L;
+@@ -1304,6 +1305,7 @@ public class ChunkMap extends SimpleRegionStorage implements ChunkHolder.PlayerP
+         public final void moonrise$clearPlayers() {
+             this.lastChunkUpdate = -1;
+             this.lastTrackedChunk = null;
++            this.ignoredBy.clear();
+             if (this.seenBy.isEmpty()) {
+                 return;
+             }
+@@ -1373,6 +1375,8 @@ public class ChunkMap extends SimpleRegionStorage implements ChunkHolder.PlayerP
+                 if (this.seenBy.isEmpty()) {
+                     ChunkMap.this.level.debugSynchronizers().dropEntity(this.entity);
+                 }
++            } else {
++                this.ignoredBy.remove(player.connection); // Paper - entity tracking events
+             }
+         }
+ 
+@@ -1407,7 +1411,7 @@ public class ChunkMap extends SimpleRegionStorage implements ChunkHolder.PlayerP
+                 }
+                 // CraftBukkit end
+                 if (visibleToPlayer) {
+-                    if (this.seenBy.add(player.connection)) {
++                    if (!this.ignoredBy.contains(player.connection) && this.seenBy.add(player.connection)) {
+                         // Paper start - entity tracking events
+                         if (io.papermc.paper.event.player.PlayerTrackEntityEvent.getHandlerList().getRegisteredListeners().length == 0 || new io.papermc.paper.event.player.PlayerTrackEntityEvent(player.getBukkitEntity(), this.entity.getBukkitEntity()).callEvent()) {
+                         this.serverEntity.addPairing(player);
+@@ -1416,9 +1420,13 @@ public class ChunkMap extends SimpleRegionStorage implements ChunkHolder.PlayerP
+                         }
+ 
+                         ChunkMap.this.level.debugSynchronizers().startTrackingEntity(player, this.entity);
++                        this.serverEntity.onPlayerAdd(); // Paper - fix desync when a player is added to the tracker
++                        } else {
++                            this.ignoredBy.add(player.connection);
++                            this.seenBy.remove(player.connection);
+                         }
+                         // Paper end - entity tracking events
+-                        this.serverEntity.onPlayerAdd(); // Paper - fix desync when a player is added to the tracker
++
+                     }
+                 } else {
+                     this.removePlayer(player);
