@@ -61,6 +61,18 @@
                  Packet<ClientGamePacketListener> packet = null;
                  boolean pos = positionChanged || this.tickCount % 60 == 0;
                  boolean sentPosition = false;
+@@ -196,7 +_,10 @@
+                 }
+ 
+                 if (packet != null) {
+-                    this.synchronizer.sendToTrackingPlayers(packet);
++                    // KigPaper - packet event
++                    if (com.playkig.kigpaper.event.EntityMovementPacketEvent.getHandlerList().getRegisteredListeners().length == 0 || new com.playkig.kigpaper.event.EntityMovementPacketEvent(entity.getBukkitEntity(), packet).callEvent()) {
++                        this.synchronizer.sendToTrackingPlayers(packet);
++                    }
+                 }
+ 
+                 this.sendDirtyEntityData();
 @@ -223,6 +_,25 @@
  
          this.tickCount++;
