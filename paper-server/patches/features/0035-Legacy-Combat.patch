@@ -195,7 +195,7 @@ index 2a71a2fa949b3a7fb8ff2c44ec3a3d8636237142..a866e29b5666b028c8501ae4502052f4
                      knockbackAmount, Mth.sin(this.getYRot() * Mth.DEG_TO_RAD), -Mth.cos(this.getYRot() * Mth.DEG_TO_RAD), damageSource, damage, comesFromEffect, this, io.papermc.paper.event.entity.EntityKnockbackEvent.Cause.ENTITY_ATTACK // Paper - knockback events
                  );
 diff --git a/net/minecraft/world/entity/projectile/FishingHook.java b/net/minecraft/world/entity/projectile/FishingHook.java
-index c0bb1b62dfcdebbd34a8e8423fa36eb4924a55e5..dff1015be00ee2ba80df74425a71e01c5a21de4d 100644
+index c0bb1b62dfcdebbd34a8e8423fa36eb4924a55e5..b33dbce42f493be7ae3f90aa258655aaba35ee7a 100644
 --- a/net/minecraft/world/entity/projectile/FishingHook.java
 +++ b/net/minecraft/world/entity/projectile/FishingHook.java
 @@ -121,6 +121,12 @@ public class FishingHook extends Projectile {
@@ -211,20 +211,30 @@ index c0bb1b62dfcdebbd34a8e8423fa36eb4924a55e5..dff1015be00ee2ba80df74425a71e01c
      }
  
      @Override
-@@ -592,6 +598,11 @@ public class FishingHook extends Projectile {
-     }
+@@ -253,7 +259,7 @@ public class FishingHook extends Projectile {
+                 }
+             }
  
-     public void pullEntity(final Entity entity) {
-+        // KigPaper start - legacy combat
-+        if (legacyMechanics && entity instanceof Player) {
-+            return;
-+        }
-+        // KigPaper end
-         Entity owner = this.getOwner();
-         if (owner != null) {
-             Vec3 delta = new Vec3(owner.getX() - this.getX(), owner.getY() - this.getY(), owner.getZ() - this.getZ()).scale(0.1);
+-            if (!fluidState.is(FluidTags.WATER) && !this.onGround() && this.hookedIn == null) {
++            if (!legacyMechanics && !fluidState.is(FluidTags.WATER) && !this.onGround() && this.hookedIn == null) { // KigPaper - legacy combat
+                 this.setDeltaMovement(this.getDeltaMovement().add(0.0, -0.03, 0.0));
+             }
+ 
+@@ -264,6 +270,12 @@ public class FishingHook extends Projectile {
+                 this.setDeltaMovement(Vec3.ZERO);
+             }
+ 
++            // KigPaper start - legacy combat
++            if (legacyMechanics && !fluidState.is(FluidTags.WATER) && !this.onGround() && this.hookedIn == null) { // KigPaper - legacy combat
++                this.setDeltaMovement(this.getDeltaMovement().add(0.0, -0.04, 0.0));
++            }
++            // KigPaper end
++
+             double inertia = 0.92;
+             this.setDeltaMovement(this.getDeltaMovement().scale(0.92));
+             this.reapplyPosition();
 diff --git a/net/minecraft/world/entity/projectile/Projectile.java b/net/minecraft/world/entity/projectile/Projectile.java
-index 9af4bf76974f05d9f752bbd4e8037560ec481cdf..39824acf19177c319850fd57c09b083c43eebb0a 100644
+index 9af4bf76974f05d9f752bbd4e8037560ec481cdf..8ac4ac1eb92db6b1019b7f5d5495b92ed76a9a43 100644
 --- a/net/minecraft/world/entity/projectile/Projectile.java
 +++ b/net/minecraft/world/entity/projectile/Projectile.java
 @@ -45,6 +45,7 @@ public abstract class Projectile extends Entity implements TraceableEntity {
@@ -247,23 +257,27 @@ index 9af4bf76974f05d9f752bbd4e8037560ec481cdf..39824acf19177c319850fd57c09b083c
      }
  
      public void setOwner(final @Nullable Entity owner) {
-@@ -130,6 +136,15 @@ public abstract class Projectile extends Entity implements TraceableEntity {
+@@ -130,6 +136,19 @@ public abstract class Projectile extends Entity implements TraceableEntity {
      }
  
      public Vec3 getMovementToShoot(final double xd, final double yd, final double zd, final float pow, final float uncertainty) {
 +        // KigPaper start - legacy combat
 +        if (legacyMechanics) {
++            boolean arrow = this instanceof AbstractArrow;
++            double mx = arrow && this.random.nextBoolean() ? -1 : 1;
++            double my = arrow && this.random.nextBoolean() ? -1 : 1;
++            double mz = arrow && this.random.nextBoolean() ? -1 : 1;
 +            return new Vec3(xd, yd, zd).normalize().add(
-+                    this.random.nextGaussian() * 0.0075 * uncertainty,
-+                    this.random.nextGaussian() * 0.0075 * uncertainty,
-+                    this.random.nextGaussian() * 0.0075 * uncertainty
++                    this.random.nextGaussian() * mx * 0.0075 * uncertainty,
++                    this.random.nextGaussian() * my * 0.0075 * uncertainty,
++                    this.random.nextGaussian() * mz * 0.0075 * uncertainty
 +            ).scale(pow);
 +        }
 +        // KigPaper end
          return new Vec3(xd, yd, zd)
              .normalize()
              .add(
-@@ -155,6 +170,13 @@ public abstract class Projectile extends Entity implements TraceableEntity {
+@@ -155,6 +174,13 @@ public abstract class Projectile extends Entity implements TraceableEntity {
          float xd = -Mth.sin(yRot * Mth.DEG_TO_RAD) * Mth.cos(xRot * Mth.DEG_TO_RAD);
          float yd = -Mth.sin((xRot + yOffset) * Mth.DEG_TO_RAD);
          float zd = Mth.cos(yRot * Mth.DEG_TO_RAD) * Mth.cos(xRot * Mth.DEG_TO_RAD);
@@ -277,6 +291,17 @@ index 9af4bf76974f05d9f752bbd4e8037560ec481cdf..39824acf19177c319850fd57c09b083c
          this.shoot(xd, yd, zd, pow, uncertainty);
          Vec3 sourceMovement = source.getKnownMovement();
          // Paper start - allow disabling relative velocity
+@@ -426,7 +452,9 @@ public abstract class Projectile extends Entity implements TraceableEntity {
+             }
+         }
+         // Paper end - Cancel hit for vanished entities
+-        return owner == null || this.leftOwner || !owner.isPassengerOfSameVehicle(entity);
++        // KigPaper - legacy combat
++        boolean leftOwner = this.leftOwner || (legacyMechanics && tickCount >= 5);
++        return owner == null || leftOwner || !owner.isPassengerOfSameVehicle(entity);
+     }
+ 
+     protected void updateRotation() {
 diff --git a/net/minecraft/world/entity/projectile/ProjectileUtil.java b/net/minecraft/world/entity/projectile/ProjectileUtil.java
 index 7a94272f5d773ead519f4ddee908722e3f4cbd7a..9e20c13af4d3243b82bba1d5ed2157bd18e0bd13 100644
 --- a/net/minecraft/world/entity/projectile/ProjectileUtil.java
@@ -323,7 +348,7 @@ index 7a94272f5d773ead519f4ddee908722e3f4cbd7a..9e20c13af4d3243b82bba1d5ed2157bd
          final Level level,
          final Entity source,
 diff --git a/net/minecraft/world/entity/projectile/ThrowableProjectile.java b/net/minecraft/world/entity/projectile/ThrowableProjectile.java
-index 62a073c3cf878b8ef7592f5157b729b969e32107..621271072bf7fc1d45247f22f05401d165054d97 100644
+index 62a073c3cf878b8ef7592f5157b729b969e32107..9a140a9e0095b4837fd9d5c9f0303ae8028a2740 100644
 --- a/net/minecraft/world/entity/projectile/ThrowableProjectile.java
 +++ b/net/minecraft/world/entity/projectile/ThrowableProjectile.java
 @@ -2,8 +2,10 @@ package net.minecraft.world.entity.projectile;
@@ -337,7 +362,7 @@ index 62a073c3cf878b8ef7592f5157b729b969e32107..621271072bf7fc1d45247f22f05401d1
  import net.minecraft.world.level.Level;
  import net.minecraft.world.level.block.Blocks;
  import net.minecraft.world.level.block.state.BlockState;
-@@ -45,8 +47,16 @@ public abstract class ThrowableProjectile extends Projectile {
+@@ -45,8 +47,12 @@ public abstract class ThrowableProjectile extends Projectile {
      @Override
      public void tick() {
          this.handleFirstTickBubbleColumn();
@@ -347,16 +372,12 @@ index 62a073c3cf878b8ef7592f5157b729b969e32107..621271072bf7fc1d45247f22f05401d1
 +        if (!legacyMechanics) {
 +            this.applyGravity();
 +            this.applyInertia();
-+        } else {
-+            if (tickCount >= 5) {
-+                leftOwner = true;
-+            }
 +        }
 +        // KigPaper end
          HitResult result = ProjectileUtil.getHitResultOnMoveVector(this, this::canHitEntity);
          Vec3 newPosition;
          if (result.getType() != HitResult.Type.MISS) {
-@@ -55,11 +65,21 @@ public abstract class ThrowableProjectile extends Projectile {
+@@ -55,11 +61,21 @@ public abstract class ThrowableProjectile extends Projectile {
              newPosition = this.position().add(this.getDeltaMovement());
          }
  
