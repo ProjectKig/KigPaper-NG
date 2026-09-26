@@ -1,0 +1,113 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: RoccoDev <hey@rocco.dev>
+Date: Sat, 26 Sep 2026 20:11:32 +0200
+Subject: [PATCH] Mace-related visibility changes
+
+
+diff --git a/net/minecraft/server/level/ServerLevel.java b/net/minecraft/server/level/ServerLevel.java
+index 9415a75893a81f3d312117377b03aa440479599b..3cb1da6b75d2b1b76c499dbebafc25a94a969e3f 100644
+--- a/net/minecraft/server/level/ServerLevel.java
++++ b/net/minecraft/server/level/ServerLevel.java
+@@ -46,16 +46,7 @@ import net.minecraft.core.particles.ParticleOptions;
+ import net.minecraft.core.registries.Registries;
+ import net.minecraft.network.chat.Component;
+ import net.minecraft.network.protocol.Packet;
+-import net.minecraft.network.protocol.game.ClientboundBlockDestructionPacket;
+-import net.minecraft.network.protocol.game.ClientboundBlockEventPacket;
+-import net.minecraft.network.protocol.game.ClientboundDamageEventPacket;
+-import net.minecraft.network.protocol.game.ClientboundEntityEventPacket;
+-import net.minecraft.network.protocol.game.ClientboundExplodePacket;
+-import net.minecraft.network.protocol.game.ClientboundGameEventPacket;
+-import net.minecraft.network.protocol.game.ClientboundLevelEventPacket;
+-import net.minecraft.network.protocol.game.ClientboundLevelParticlesPacket;
+-import net.minecraft.network.protocol.game.ClientboundSoundEntityPacket;
+-import net.minecraft.network.protocol.game.ClientboundSoundPacket;
++import net.minecraft.network.protocol.game.*;
+ import net.minecraft.resources.ResourceKey;
+ import net.minecraft.server.MinecraftServer;
+ import net.minecraft.server.ServerScoreboard;
+@@ -2025,6 +2016,12 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
+         for (ServerPlayer player : this.players) {
+             if (player.distanceToSqr(center) < 4096.0) {
+                 Optional<Vec3> playerKnockback = Optional.ofNullable(explosion.getHitPlayers().get(player));
++                // KigPaper start
++                if (!new com.playkig.kigpaper.event.ExplosionDisplayEvent(player.getBukkitEntity(), source != null ? source.getBukkitEntity() : null).callEvent()) {
++                    playerKnockback.ifPresent(m -> player.connection.send(new ClientboundSetEntityMotionPacket(player.getId(), m)));
++                    continue;
++                }
++                // KigPaper end
+                 player.connection.send(new ClientboundExplodePacket(center, r, blockCount, playerKnockback, explosionParticle, explosionSound, blockParticles));
+             }
+         }
+diff --git a/net/minecraft/server/level/ServerPlayer.java b/net/minecraft/server/level/ServerPlayer.java
+index 3cd4e850f223100b61ac6831a87dd38f3a3bb58f..076b0288168e659435c89f484bb1d79211524c8d 100644
+--- a/net/minecraft/server/level/ServerPlayer.java
++++ b/net/minecraft/server/level/ServerPlayer.java
+@@ -1756,8 +1756,9 @@ public class ServerPlayer extends Player implements ca.spottedleaf.moonrise.patc
+         if (this.spawnExtraParticlesOnFall && onGround && this.fallDistance > 0.0) {
+             Vec3 centered = Vec3.atCenterOf(pos).add(0.0, 0.5, 0.0);
+             int particles = (int)Mth.clamp(50.0 * this.fallDistance, 0.0, 200.0);
++            // KigPaper - add source
+             this.level()
+-                .sendParticles(new BlockParticleOption(ParticleTypes.BLOCK, onState), centered.x, centered.y, centered.z, particles, 0.3F, 0.3F, 0.3F, 0.15F);
++                .sendParticlesSource(this, new BlockParticleOption(ParticleTypes.BLOCK, onState), false, false, centered.x, centered.y, centered.z, particles, 0.3F, 0.3F, 0.3F, 0.15F);
+             this.spawnExtraParticlesOnFall = false;
+         }
+ 
+diff --git a/net/minecraft/world/item/MaceItem.java b/net/minecraft/world/item/MaceItem.java
+index 681ef7b4f6f987b1779859ed1d9bcd6e5670adab..e3768be4829c345eb260d29601d26651ed01c7df 100644
+--- a/net/minecraft/world/item/MaceItem.java
++++ b/net/minecraft/world/item/MaceItem.java
+@@ -3,6 +3,7 @@ package net.minecraft.world.item;
+ import java.util.List;
+ import java.util.function.Predicate;
+ import net.minecraft.core.Direction;
++import net.minecraft.network.protocol.game.ClientboundLevelEventPacket;
+ import net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket;
+ import net.minecraft.server.level.ServerLevel;
+ import net.minecraft.server.level.ServerPlayer;
+@@ -124,14 +125,19 @@ public class MaceItem extends Item {
+     }
+ 
+     private static void knockback(final Level level, final Entity attacker, final Entity entity) {
+-        level.levelEvent(LevelEvent.PARTICLES_SMASH_ATTACK, entity.getOnPos(), 750);
++        // KigPaper start - respect visibility
++        level.levelEvent(attacker, LevelEvent.PARTICLES_SMASH_ATTACK, entity.getOnPos(), 750);
++        if (attacker instanceof ServerPlayer player) {
++            player.connection.send(new ClientboundLevelEventPacket(LevelEvent.PARTICLES_SMASH_ATTACK, entity.getOnPos(), 750, false));
++        }
++        // KigPaper end
+         level.getEntitiesOfClass(LivingEntity.class, entity.getBoundingBox().inflate(3.5), knockbackPredicate(attacker, entity)).forEach(nearby -> {
+             Vec3 direction = nearby.position().subtract(entity.position());
+             double knockbackPower = getKnockbackPower(attacker, nearby, direction);
+             Vec3 knockbackVector = direction.normalize().scale(knockbackPower);
+             if (knockbackPower > 0.0) {
+                 nearby.push(knockbackVector.x, 0.7F, knockbackVector.z, attacker); // Paper - Add EntityKnockbackByEntityEvent and EntityPushedByEntityAttackEvent
+-                if (nearby instanceof ServerPlayer otherPlayer) {
++                if (nearby.needsSync && nearby instanceof ServerPlayer otherPlayer) { // KigPaper - needsSync
+                     otherPlayer.connection.send(new ClientboundSetEntityMotionPacket(otherPlayer));
+                 }
+             }
+diff --git a/net/minecraft/world/item/enchantment/effects/ExplodeEffect.java b/net/minecraft/world/item/enchantment/effects/ExplodeEffect.java
+index 91f9d6b0cf80b98f2364a4b920f735a018aa26ec..82a149a81d42096ee77fc558408f7f2caec168b6 100644
+--- a/net/minecraft/world/item/enchantment/effects/ExplodeEffect.java
++++ b/net/minecraft/world/item/enchantment/effects/ExplodeEffect.java
+@@ -60,7 +60,7 @@ public record ExplodeEffect(
+     @Override
+     public void apply(final ServerLevel serverLevel, final int enchantmentLevel, final EnchantedItemInUse item, final Entity entity, final Vec3 position) {
+         Vec3 pos = position.add(this.offset);
+-        serverLevel.explode(
++        serverLevel.explode0( // KigPaper
+             this.attributeToUser ? entity : null,
+             this.getDamageSource(entity, pos),
+             new SimpleExplosionDamageCalculator(
+@@ -78,7 +78,8 @@ public record ExplodeEffect(
+             this.smallParticle,
+             this.largeParticle,
+             this.blockParticles,
+-            this.sound
++            this.sound,
++            e -> e.excludeSourceFromDamage = false // KigPaper
+         );
+     }
+ 
