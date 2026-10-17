@@ -1,0 +1,20 @@
+--- a/net/minecraft/world/entity/SteppedInterpolationTracker.java
++++ b/net/minecraft/world/entity/SteppedInterpolationTracker.java
+@@ -2,6 +_,8 @@
+ 
+ import java.util.ArrayList;
+ import java.util.List;
++
++import com.playkig.kigpaper.config.KigPaperConfig;
+ import net.minecraft.world.phys.Vec3;
+ 
+ public class SteppedInterpolationTracker extends InterpolationHandler.NoOpInterpolationHandler implements InterpolationTracker {
+@@ -47,6 +_,8 @@
+ 
+     @Override
+     public PositionPath getPositionPath(final Vec3 currentPosition) {
++        // KigPaper - work around 26.3 interpolation
++        if (KigPaperConfig.get().legacyMoveInterpolation) return PositionPath.stepped(List.of(new PositionStep(currentPosition, 3)));
+         this.addStep(currentPosition);
+         return this.trackedSteps.isEmpty() ? PositionPath.of(currentPosition) : PositionPath.stepped(List.copyOf(this.trackedSteps));
+     }

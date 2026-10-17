@@ -7,6 +7,7 @@ public class KigPaperConfig extends ConfigurationPart {
 
   public DefaultLegacyCombatConfig legacyCombat;
   public boolean sendRecipeBook = true;
+  public boolean legacyMoveInterpolation = false;
 
   public static KigPaperConfig get() {
     return INSTANCE;
@@ -22,5 +23,9 @@ public class KigPaperConfig extends ConfigurationPart {
 
   public boolean sendRecipeBook() {
     return sendRecipeBook;
+  }
+
+  public boolean legacyMoveInterpolation() {
+    return legacyMoveInterpolation;
   }
 }
