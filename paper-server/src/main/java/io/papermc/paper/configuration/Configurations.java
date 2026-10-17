@@ -94,7 +94,7 @@ public abstract class Configurations<G, W> {
         };
     }
 
-    static <T> CheckedFunction<ConfigurationNode, T, SerializationException> reloader(Class<T> type, T instance) {
+    public static <T> CheckedFunction<ConfigurationNode, T, SerializationException> reloader(Class<T> type, T instance) {
         return node -> {
             ObjectMapper.Factory factory = (ObjectMapper.Factory) Objects.requireNonNull(node.options().serializers().get(type));
             ObjectMapper.Mutable<T> mutable = (ObjectMapper.Mutable<T>) factory.get(type);
