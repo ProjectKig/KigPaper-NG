@@ -54,7 +54,7 @@
          if (this.state == ServerLoginPacketListenerImpl.State.VERIFYING) {
              this.verifyLoginAndFinishConnectionSetup(Objects.requireNonNull(this.authenticatedProfile));
          }
-@@ -79,16 +_,39 @@
+@@ -79,19 +_,44 @@
              this.finishLoginAndWaitForClient(this.authenticatedProfile);
          }
  
@@ -84,7 +84,8 @@
 +    // Paper start
 +    public void disconnectAsync(Component reason) {
 +        try {
-+            LOGGER.info("Disconnecting {}: {}", this.getUserName(), reason.getString());
++            // KigPaper - debloat
++            // LOGGER.info("Disconnecting {}: {}", this.getUserName(), reason.getString());
 +            this.connection.send(new ClientboundLoginDisconnectPacket(reason), PacketSendListener.thenRun(() -> this.connection.disconnect(reason)));
 +            this.connection.handleConnectionDisconnectOnNextTick = true;
 +        } catch (Exception var3) {
@@ -94,7 +95,22 @@
 +    // Paper end
      public void disconnect(final Component component) {
          try {
-             LOGGER.info("Disconnecting {}: {}", this.getUserName(), component.getString());
+-            LOGGER.info("Disconnecting {}: {}", this.getUserName(), component.getString());
++            // KigPaper - debloat
++            // LOGGER.info("Disconnecting {}: {}", this.getUserName(), reason.getString());
+             this.connection.send(new ClientboundLoginDisconnectPacket(component));
+             this.connection.disconnect(component);
+         } catch (Exception e) {
+@@ -105,7 +_,8 @@
+ 
+     @Override
+     public void onDisconnect(final DisconnectionDetails details) {
+-        LOGGER.info("{} lost connection: {}", this.getUserName(), details.reason().getString());
++        // KigPaper - debloat
++        // LOGGER.info("{} lost connection: {}", this.getUserName(), details.reason().getString());
+     }
+ 
+     public String getUserName() {
 @@ -116,7 +_,14 @@
      @Override
      public void handleHello(final ServerboundHelloPacket packet) {
@@ -111,7 +127,7 @@
          this.requestedUsername = packet.name();
          GameProfile singleplayerProfile = this.server.getSingleplayerProfile();
          if (singleplayerProfile != null && this.requestedUsername.equalsIgnoreCase(singleplayerProfile.name())) {
-@@ -126,7 +_,30 @@
+@@ -126,7 +_,31 @@
                  this.state = ServerLoginPacketListenerImpl.State.KEY;
                  this.connection.send(new ClientboundHelloPacket("", this.server.getKeyPair().getPublic().getEncoded(), this.challenge, true));
              } else {
@@ -132,7 +148,8 @@
 +                        GameProfile gameprofile = ServerLoginPacketListenerImpl.this.createOfflineProfile(ServerLoginPacketListenerImpl.this.requestedUsername); // Spigot
 +
 +                        gameprofile = ServerLoginPacketListenerImpl.this.callPlayerPreLoginEvents(gameprofile); // Paper - Add more fields to AsyncPlayerPreLoginEvent
-+                        ServerLoginPacketListenerImpl.LOGGER.info("UUID of player {} is {}", gameprofile.name(), gameprofile.id());
++                        // KigPaper - debloat
++                        // ServerLoginPacketListenerImpl.LOGGER.info("UUID of player {} is {}", gameprofile.name(), gameprofile.id());
 +                        ServerLoginPacketListenerImpl.this.startClientVerification(gameprofile);
 +                    } catch (Exception ex) {
 +                        ServerLoginPacketListenerImpl.this.disconnect("Failed to verify username!");
@@ -193,17 +210,19 @@
              @Override
              public void run() {
                  String name = Objects.requireNonNull(ServerLoginPacketListenerImpl.this.requestedUsername, "Player name not initialized");
-@@ -197,12 +_,18 @@
+@@ -197,12 +_,19 @@
                          .hasJoinedServer(name, digest, this.getAddress());
                      if (result != null) {
                          GameProfile profile = result.profile();
+-                        ServerLoginPacketListenerImpl.LOGGER.info("UUID of player {} is {}", profile.name(), profile.id());
 +                        // CraftBukkit start - fire PlayerPreLoginEvent
 +                        if (!ServerLoginPacketListenerImpl.this.connection.isConnected()) {
 +                            return;
 +                        }
 +                        profile = ServerLoginPacketListenerImpl.this.callPlayerPreLoginEvents(profile); // Paper - Add more fields to AsyncPlayerPreLoginEvent
 +                        // CraftBukkit end
-                         ServerLoginPacketListenerImpl.LOGGER.info("UUID of player {} is {}", profile.name(), profile.id());
++                        // KigPaper - debloat
++                        // ServerLoginPacketListenerImpl.LOGGER.info("UUID of player {} is {}", profile.name(), profile.id());
                          ServerLoginPacketListenerImpl.this.serverActivityMonitor.reportLoginActivity();
                          ServerLoginPacketListenerImpl.this.startClientVerification(profile);
                      } else if (ServerLoginPacketListenerImpl.this.server.isSingleplayer()) {
@@ -232,7 +251,7 @@
                  }
              }
  
-@@ -224,18 +_,123 @@
+@@ -224,18 +_,124 @@
                      ? inetSocketAddress.getAddress()
                      : null;
              }
@@ -341,7 +360,8 @@
 +            authenticatorPool.execute(() -> {
 +                try {
 +                    final GameProfile gameprofile = this.callPlayerPreLoginEvents(this.authenticatedProfile);
-+                    ServerLoginPacketListenerImpl.LOGGER.info("UUID of player {} is {}", gameprofile.name(), gameprofile.id());
++                    // KigPaper - debloat
++                    // ServerLoginPacketListenerImpl.LOGGER.info("UUID of player {} is {}", gameprofile.name(), gameprofile.id());
 +                    ServerLoginPacketListenerImpl.this.startClientVerification(gameprofile);
 +                } catch (Exception ex) {
 +                    disconnect("Failed to verify username!");
