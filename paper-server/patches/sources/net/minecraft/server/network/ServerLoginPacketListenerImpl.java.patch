@@ -401,7 +401,7 @@
 +
 +        if (this.connection.spoofedProfile != null) {
 +            for (com.mojang.authlib.properties.Property property : this.connection.spoofedProfile) {
-+                if (!ServerHandshakePacketListenerImpl.PROP_PATTERN.matcher(property.name()).matches()) continue;
++                // if (!ServerHandshakePacketListenerImpl.PROP_PATTERN.matcher(property.name()).matches()) continue; // KigPaper - remove spigot check
 +                props.put(property.name(), property);
 +            }
 +        }
