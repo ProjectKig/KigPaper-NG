@@ -3,6 +3,7 @@ package org.bukkit;
 import com.google.common.base.Preconditions;
 import java.util.Random;
 import io.papermc.paper.math.Position;
+import net.kyori.adventure.key.Key;
 import org.bukkit.command.CommandSender;
 import org.bukkit.generator.BiomeProvider;
 import org.bukkit.generator.ChunkGenerator;
@@ -19,6 +20,7 @@ public class WorldCreator {
     private final String name;
     private long seed;
     private World.Environment environment = World.Environment.NORMAL;
+    private Key customDimensionType; // KigPaper
     private ChunkGenerator generator = null;
     private BiomeProvider biomeProvider = null;
     private WorldType type = WorldType.NORMAL;
@@ -151,6 +153,7 @@ public class WorldCreator {
 
         seed = world.getSeed();
         environment = world.getEnvironment();
+        // KigPaper - not copying custom dimension type i guess
         generator = world.getGenerator();
         biomeProvider = world.getBiomeProvider();
         type = world.getWorldType();
@@ -173,6 +176,7 @@ public class WorldCreator {
 
         seed = creator.seed();
         environment = creator.environment();
+        customDimensionType = creator.customDimensionType;
         generator = creator.generator();
         biomeProvider = creator.biomeProvider();
         type = creator.type();
@@ -242,6 +246,17 @@ public class WorldCreator {
 
         return this;
     }
+
+    // KigPaper start
+    public @Nullable Key customDimensionType() {
+        return customDimensionType;
+    }
+
+    public WorldCreator customDimensionType(Key customEnvironment) {
+        this.customDimensionType = customEnvironment;
+        return this;
+    }
+    // KigPaper end
 
     /**
      * Gets the type of the world that will be created or loaded
